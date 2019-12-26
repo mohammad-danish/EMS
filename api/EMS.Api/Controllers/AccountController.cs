@@ -189,7 +189,7 @@ namespace EMS.Api.Controllers
         }
 
         [HttpDelete("user-roles")]
-        [Authorize(Roles = Role.SuperAdmin)]
+        [Authorize(Policy = "canDeleteUserRoles")]
         public async Task<IActionResult> DeleteUserRoles([FromBody] ManageUserRoleDTO model)
         {
             if (!ModelState.IsValid)
@@ -234,7 +234,7 @@ namespace EMS.Api.Controllers
         #endregion
 
 
-        #region Manage User Claims
+        #region Manage User's Claims
 
         [HttpGet("user-claims")]
         public async Task<IActionResult> GetUserClaims([FromQuery] string emailId)
@@ -286,6 +286,103 @@ namespace EMS.Api.Controllers
         #endregion
 
 
+        #region Manage Role's Claims
+
+        [HttpGet("role-claims")]
+        [Authorize(Roles = Role.Admin )]
+        public async Task<IActionResult> GetRoleClaims()
+        {
+            var roleClaims = new Dictionary<IdentityRole, IEnumerable<Claim>>();
+            var currentRoles = roleManager.Roles.ToList();
+            foreach (var role in currentRoles)
+            {
+                roleClaims.Add(role, await roleManager.GetClaimsAsync(role));
+            }
+
+            return Ok(roleClaims);
+        }
+
+        [HttpPost("role-claims")]
+        [Authorize(Roles = Role.Admin)]
+        public async Task<IActionResult> AddRoleClaims([FromBody] ManageRoleClaimsDTO manageRoleClaimsDTOs)
+        {
+            if (!ModelState.IsValid)
+            { return BadRequest("Invalid Request model."); }
+
+            string id = manageRoleClaimsDTOs.RoleId.ToString();
+            var role = await roleManager.FindByIdAsync(id);
+
+            if(role is null)
+            {
+                return BadRequest($"Role with give id '{id}' does not exits.");
+            }
+
+            var claims = manageRoleClaimsDTOs.Claims.Select(c => new Claim(c.Key, c.Value));
+
+            var response = ManageRoleClaims(role, claims, roleManager.AddClaimAsync);
+
+            return Ok(response);
+        }
+
+        [HttpDelete("role-claims")]
+        [Authorize(Roles = Role.Admin)]
+        public async Task<IActionResult> DeleteRoleClaims([FromBody] ManageRoleClaimsDTO manageRoleClaimsDTOs)
+        {
+            if (!ModelState.IsValid)
+            { return BadRequest("Invalid Request model."); }
+
+            string id = manageRoleClaimsDTOs.RoleId.ToString();
+            var role = await roleManager.FindByIdAsync(id);
+
+            if (role is null)
+            {
+                return BadRequest($"Role with give id '{id}' does not exits.");
+            }
+
+            var claims = manageRoleClaimsDTOs.Claims.Select(c => new Claim(c.Key, c.Value));
+
+            var response = ManageRoleClaims(role, claims, roleManager.RemoveClaimAsync);
+
+            return Ok(response);
+        }
+
+        private async Task<IEnumerable<StatusDTO<string, bool>>> ManageRoleClaims(IdentityRole role, IEnumerable<Claim> claims, Func<IdentityRole, Claim, Task<IdentityResult>> operation)
+        {
+            var response = new List<StatusDTO<string, bool>>();
+
+            foreach (var claim in claims)
+            {
+                var status = new StatusDTO<string, bool>
+                {
+                    Id = role.Id,
+                    Name = claim.Type
+                };
+
+                var result = await operation(role, claim);
+                status.Status = result.Succeeded;
+                status.Error = string.Join('|', result.Errors.Select(e => e.Description));
+            }
+
+            return response;
+        }
+        #endregion
+
+        #region Manage Users
+
+
+        [HttpGet("users")]
+        [Authorize(Policy = "canViewUsers")]
+        public IActionResult GetUsers()
+        {
+            var users = userManager.Users
+                        .Select(u => new 
+                        {   u.Email,
+                            u.EmailConfirmed
+                        });
+            return Ok(users);
+        }
+
+        #endregion
 
     }
 }

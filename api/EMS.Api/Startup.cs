@@ -32,7 +32,7 @@ namespace EMS.Api
 
             services.AddTokenBasedAuthentication(Configuration);
 
-
+            services.AddClaimBasedAuthorization();
 
         }
 

@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using EMS.Shared.Constants;
 
 namespace EMS.Api
 {
@@ -49,6 +50,14 @@ namespace EMS.Api
                 (options => configuration.GetSection("TokenOption").Bind(options));
         }
 
+        public static void AddClaimBasedAuthorization(this IServiceCollection services)
+        {
+            services.AddAuthorization(option =>
+            {
+                option.AddPolicy(Policies.CanDeleteUserRoles, p => p.RequireClaim(AppClaims.CanDeleteUserRoles, "true"));
+                option.AddPolicy(Policies.CanViewUsers, p => p.RequireRole(Role.Admin));
+            });
+        }
 
     }
 }
